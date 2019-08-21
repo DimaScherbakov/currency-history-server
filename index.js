@@ -6,10 +6,16 @@ const express = require('express'),
   cors = require('cors'),
   mongoose = require('mongoose');
 mongoose.Promise = global.Promise;
-
+var rateSchema = new mongoose.Schema({
+  date: String,
+  value: Number,
+  _id: false,
+  min: { type: Boolean, required: false },
+  max: { type: Boolean, required: false }
+});
 var currencyPairSchema = new mongoose.Schema({
-  name: String,
-  rates: Array
+  name: { type: String },
+  rates: [rateSchema]
 });
 var currencyPair = mongoose.model('currencyPair', currencyPairSchema);
 mongoose
@@ -26,29 +32,31 @@ mongoose
   );
 
 const app = express();
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' }));
+
 app.use('*', cors());
 
 app.get('/:name', function(req, res) {
-  currencyPair.find({ name: req.params.name }, function(err, currency) {
+  currencyPair.findOne({ name: req.params.name }, function(err, currency) {
     if (err) {
-      console.log(err);
       res.status(404).send(err);
     } else {
-      console.log(currency);
       res.send(currency);
     }
   });
 });
-
-app.post('/', function(req, res) {
-  var pair = new currencyPair({ name: req.body.name, rates: req.body.rates });
-  currencyPair
-    .find({ name: req.body.name })
-    .remove()
-    .exec();
-  pair.save(function(err, pair) {
-    if (err) return console.error(err);
+app.post('/:name', function(req, res) {
+  var pair = new currencyPair({ name: req.params.name });
+  for (i in req.body) {
+    pair.rates.push(req.body[i]);
+  }
+  currencyPair.remove({ name: req.params.name }, () => {});
+  pair.save(function(err, item) {
+    if (err) {
+      res.status(400).send(err);
+    } else {
+      res.status(200).send('item saved to database');
+    }
   });
 });
 const port = process.env.PORT || 4000;
